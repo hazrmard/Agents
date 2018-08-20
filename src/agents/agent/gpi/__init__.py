@@ -17,6 +17,10 @@ All `Agent`s have the following API:
   policy. Arguments and returns are tuples of int/float.
 """
 
+# TODO: Add policy iteration to Agent via 2 alternating policies: one being
+# learned and one being used to choose actions. Update frequency=0 is
+# value iteration as learned policy is immediately used to choose next action.
+
 from .agent import Agent
 from .offpolicy import QAgent, NStepTDAgent
 from .onpolicy import NStepSarsaAgent
