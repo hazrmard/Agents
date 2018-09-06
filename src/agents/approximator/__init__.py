@@ -15,6 +15,8 @@ All `Approximator`s have the following API:
   of predicted values.
 """
 
+# TODO: functions to set weights/get weights.
+
 from .approximator import Approximator
 from .polynomial import Polynomial
 from .neural import Neural
