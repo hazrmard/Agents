@@ -11,7 +11,7 @@ from numpy.random import RandomState
 from gym.core import Env, Space
 
 from ...helpers import spaces, maximum
-from ...helpers.parameters import Schedule, evaluate_schedule_kwargs
+from ...helpers.schedule import Schedule, evaluate_schedule_kwargs
 from ..memory import Memory
 
 UNIFORM = 'uniform'
@@ -38,7 +38,9 @@ class Agent:
     * eps_current (float): The current value of exploration rate (epsilon) during
     learning for each episode.
     * maximum (Callable): A function that takes the state tuple and returns the
-    maximum value and corresponding action tuple from the value approximation.
+    maximum value and corresponding action tuple from the value approximation. In
+    case the value function outputs a vector of values (for each action), that
+    vector is also returned.
     """
 
     def __init__(self, env: Env, value_function: 'Approximator',\
@@ -66,19 +68,27 @@ class Agent:
         """
         # TODO: Allow for discrete maximization over continuous spaces in case
         # the learned value function is discrete/ does not have a defined minimum.
-        cont = spaces.is_continuous(space)
-        action_bounds = spaces.bounds(space)
-        if all(cont):
-            self.maximum = lambda s: maximum.max_continuous(self.value.predict,\
-                                    action_bounds, s)
-        
-        elif any(cont):
-            self.maximum = lambda s: maximum.max_hybrid(self.value.predict,\
-                                    action_bounds, cont, s, self.actions)
-        
+
+        # If value function is of the form V(state, action) => number, then
+        # maximize over action space to find best action.
+        if self.value.outdim == 1:
+            cont = spaces.is_continuous(space)
+            action_bounds = spaces.bounds(space)
+            if all(cont):
+                self.maximum = lambda s: maximum.max_continuous(self.value.predict,\
+                                        action_bounds, s)
+            
+            elif any(cont):
+                self.maximum = lambda s: maximum.max_hybrid(self.value.predict,\
+                                        action_bounds, cont, s, self.actions)
+            
+            else:
+                self.maximum = lambda s: maximum.max_discrete(self.value.predict,\
+                                        self.actions, s)
+        # Else if value function is of the form V(state) => [V_a1, V_a2, ...]
+        # Then simply to an array search for max and argmax
         else:
-            self.maximum = lambda s: maximum.max_discrete(self.value.predict,\
-                                    self.actions, s)
+            self.maximum = lambda s: maximum.max_array(self.value.predict, s)
 
 
     def set_action_selection_policy(self, policy: str):
@@ -141,10 +151,10 @@ class Agent:
         """
         memory = Memory(memsize=memsize, batchsize=batchsize) # experience-replay
         self.set_action_selection_policy(policy)
-        histories = np.zeros(episodes)  # history of rewards for each episode
+        histories = np.zeros(int(episodes))  # history of rewards for each episode
         epsilon = Schedule(epsilon) if not isinstance(epsilon, Schedule) else epsilon
 
-        for i in range(episodes):
+        for i in range(int(episodes)):
             self.eps_curr = epsilon(i)  # greedy-rate for GREEDY policy
             kw = evaluate_schedule_kwargs(i, **kwargs)
             r = algorithm(self, memory=memory, **kw)
@@ -164,7 +174,7 @@ class Agent:
         Returns:
         * Action to take (tuple).
         """
-        value, action = self.maximum(state)
+        value, action, _ = self.maximum(state)
         return action
 
 

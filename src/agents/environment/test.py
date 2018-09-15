@@ -1,10 +1,10 @@
 import unittest
-from numbers import Number
 
 import numpy as np
 from gym.spaces import MultiDiscrete
 
-from . import dummy, Environment
+from . import Environment
+from .dummy.test import *
 
 
 class TestEnvironment(unittest.TestCase):
@@ -44,28 +44,6 @@ class TestEnvironment(unittest.TestCase):
         self.assertEqual(self.env.t, 10)
         self.env.reset()
         self.assertEqual(self.env.t, 0)
-
-
-
-class TestDummyEnv(unittest.TestCase):
-
-    def env_tester(self, env: Environment):
-        type_s = type(env.reset())
-        for i in range(env.maxsteps):
-            s, r, d, _ = env.step(env.action_space.sample())
-            self.assertEqual(type_s, type(s))
-            self.assertTrue(isinstance(d, (bool, np.bool_, np.bool)))
-            self.assertIsInstance(r, Number)
-
-
-    def test_Dummy1DContinuous(self):
-        env = dummy.Dummy1DContinuous()
-        self.env_tester(env)
-
-
-    def test_DummySwitch(self):
-        env = dummy.DummySwitch()
-        self.env_tester(env)
 
 
 

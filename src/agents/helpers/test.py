@@ -5,7 +5,7 @@ import gym
 import numpy as np
 
 from . import spaces, maximum
-from .parameters import *
+from .schedule import *
 
 
 
@@ -120,25 +120,25 @@ class TestMaximum(unittest.TestCase):
 
     def test_max_discrete(self):
         over = [(1,), (2,), (3,), (4,)]
-        func = lambda x: -np.asarray(x).ravel()       # returns an array of 1 elem
+        func = lambda x: -np.asarray(x).reshape(1, 1)   # 2D array of 1 elem
         state = tuple()
-        m, arg = maximum.max_discrete(func, over, state)
+        m, arg, _ = maximum.max_discrete(func, over, state)
         self.assertEqual(arg, (1,))
         self.assertEqual(m, -1)
 
 
     def test_max_continuous(self):
-        func = lambda x: np.asarray(x).ravel()**2       # returns an array of 1 elem
+        func = lambda x: np.asarray(x).reshape(1,1)**2   # 2D array of 1 elem
         over = ((-2, 2),)
         state = tuple()
-        m, arg = maximum.max_continuous(func, over, state)
+        m, arg, _ = maximum.max_continuous(func, over, state)
         self.assertAlmostEqual(m, 4, places=4)
 
 
     def test_max_hybrid(self):
         def func(arg):
             x, y = arg[0]
-            return np.asarray((10 - x**2 - y**2,))   # returns an array of 1 elem
+            return np.asarray((10 - x**2 - y**2,)).reshape(1,1)   # 2D array of 1 elem
         
         discrete = gym.spaces.Tuple((gym.spaces.Box(low=-5, high=5, shape=(1,), dtype=int), gym.spaces.Discrete(5)))
         halfcontinuous = gym.spaces.Tuple((gym.spaces.Box(low=-5, high=5, shape=(1,), dtype=float), gym.spaces.Discrete(5)))
@@ -150,9 +150,9 @@ class TestMaximum(unittest.TestCase):
         bounds = spaces.bounds(discrete)
         state = tuple()
 
-        m1, a1 = maximum.max_hybrid(func, bounds, state, contd, spaces.enumerate_discrete_space(discrete))
-        m2, a2 = maximum.max_hybrid(func, bounds, state, conthc, spaces.enumerate_discrete_space(halfcontinuous))
-        m3, a3 = maximum.max_hybrid(func, bounds, state, contc, spaces.enumerate_discrete_space(continuous))
+        m1, a1, _ = maximum.max_hybrid(func, bounds, state, contd, spaces.enumerate_discrete_space(discrete))
+        m2, a2, _ = maximum.max_hybrid(func, bounds, state, conthc, spaces.enumerate_discrete_space(halfcontinuous))
+        m3, a3, _ = maximum.max_hybrid(func, bounds, state, contc, spaces.enumerate_discrete_space(continuous))
 
         self.assertAlmostEqual(m1, 10, places=4)
         self.assertAlmostEqual(m2, 10, places=4)
@@ -164,6 +164,15 @@ class TestMaximum(unittest.TestCase):
         self.assertIsInstance(a2[0], float)
         self.assertIsInstance(a2[1], int)
         self.assertIsInstance(a3[0], float)
+
+
+    def test_max_array(self):
+        def func(state):
+            return (np.arange(5)**2).reshape(1, -1)
+        m, arg, arr = maximum.max_array(func, None)
+        self.assertEqual(m, 16)
+        self.assertEqual(arg, (4,))
+        self.assertTrue(np.array_equal(arr, np.arange(5)**2))
 
 
 

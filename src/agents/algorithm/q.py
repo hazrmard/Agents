@@ -4,7 +4,7 @@ episode. Q-learning is an off-policy temporal difference learning algorithm.
 """
 import numpy as np
 
-from ..helpers.spaces import to_space, to_tuple, len_space_tuple
+from ..helpers.spaces import to_space, to_tuple
 
 
 def q(agent: 'Agent', memory: 'Memory', discount: float, maxsteps: int=np.inf,\
@@ -32,9 +32,8 @@ def q(agent: 'Agent', memory: 'Memory', discount: float, maxsteps: int=np.inf,\
     t = 0   # keeping track of steps
 
     # preallocate arrays for states (X) -> value targets (Y) for approximator
-    batchX = np.zeros((memory.batchsize, len(state) + \
-                        len_space_tuple(agent.env.action_space)))
-    batchY = np.zeros(memory.batchsize)
+    batchX = np.zeros((memory.batchsize, agent.value.indim))
+    batchY = np.zeros((memory.batchsize, agent.value.outdim))
 
     while (not done) and (t < maxsteps):
         # select exploratory action
@@ -45,15 +44,33 @@ def q(agent: 'Agent', memory: 'Memory', discount: float, maxsteps: int=np.inf,\
 
         # memorize experience
         memory.append((state, action, reward, nstate))
-        # replay experience from memory
-        samples = memory.sample()
-        for i, (s, a, r, ns) in enumerate(samples):
-            # calculate new estimate of return
-            nvalue, _ = agent.maximum(ns)
-            ret = r + discount * nvalue
-            # fill batch with state/actions -> values
-            batchX[i] = [*s, *a]
-            batchY[i] = ret
+
+        # Replay experience from memory and calculate new estimate of return.
+        # An approximator with outdim=1, the output value will only be for
+        # the action taken (since it is passed as argument). So only that
+        # action value needs to be updated.
+        if agent.value.outdim == 1:
+            for i, (s, a, r, ns) in enumerate(memory.sample()):
+                # calculate new estimate of return
+                nvalue, _ = agent.maximum(ns)
+                ret = r + discount * nvalue
+                # fill batch with state/actions -> values
+                batchX[i] = [*s, *a]
+                batchY[i] = ret
+        # An approximator with outdim > 1 will return a multi-column row
+        # vector which has action values for all actions. So a new vector
+        # is constructed which only updates the estimate for the action
+        # taken and uses prior estimates for other actions.
+        else:
+             for i, (s, a, r, ns) in enumerate(memory.sample()):
+                # calculate new estimate of return
+                nvalue, _, predictions = agent.maximum(ns)
+                ret = r + discount * nvalue
+                # fill batch with states -> action values
+                batchX[i] = s
+                batchY[i] = predictions
+                batchY[i, a] = ret
+
         # update value function with new estimate
         agent.value.update(batchX, batchY)
         state = nstate

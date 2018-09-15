@@ -10,6 +10,11 @@ class DummySwitch(Environment):
     A discrete environment represented by a switch taking a finite number of
     states. A state is represented by a single number. An action moves the state
     value up, down, or remains static.
+
+    Args:
+
+    * `maxsteps (int)`: Maximum number of steps before episode ends.
+    * `random_state (int, np.random.RandomState)`: Random seed.
     """
 
     NSTATES = 5
@@ -38,10 +43,10 @@ class DummySwitch(Environment):
         return -1
 
 
-    def __init__(self, random_state=None):
+    def __init__(self, maxsteps=None, random_state=None):
         observation_space = Discrete(self.NSTATES)
         action_space = Discrete(3)
-        maxsteps = 2 * self.NSTATES
+        maxsteps = 2 * self.NSTATES if maxsteps is None else maxsteps
         super().__init__(reward=self.reward_func,
                          transition=self.transition_func,
                          observation_space=observation_space,

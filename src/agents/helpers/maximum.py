@@ -1,6 +1,12 @@
 """
 Defines functions to compute maximum of a function over a discrete or
 continuous space.
+
+The functions should be of the form:
+
+    [[argument]]    =>  f   => [[result]]
+
+i.e. all inputs and outputs in a 2D array (see Approximators)
 """
 
 from typing import Callable, Tuple, Iterable, Union
@@ -11,14 +17,14 @@ from scipy.optimize import minimize
 
 
 def max_discrete(func: Callable[[Tuple], np.ndarray], over: Iterable[Tuple],\
-    state: Tuple[Union[int, float]]) -> Tuple[float, Tuple[Union[int, float]]]:
+    state: Tuple[Union[int, float]]) -> Tuple[float, Tuple[Union[int, float]], None]:
     """
     Calculates the maximum value of a function over a discrete space.
-    The function is of the form `f(state,...,action) -> float`.
+    The function is of the form `f([[state,...,action]]) -> [[float]]`.
 
     Args:
-    * func: The function that accepts a tuple of arguments and returns a float
-    to maximize.
+    * func: The function that accepts a tuple/2D array of arguments and returns
+    a float to maximize.
     * over: An iterable of argument tuples to maximize over. I.e. the iterable
     enumerates all the arguments to compare.
     * state: The prefix argument i.e. the state over which to explore action space.
@@ -26,18 +32,19 @@ def max_discrete(func: Callable[[Tuple], np.ndarray], over: Iterable[Tuple],\
     Returns a tuple of:
     * The maximum value,
     * The corresponding argument tuple.
+    * None
     """
-    vals = [func(np.asarray((*state, *action)).reshape(1, -1))[0] for action in over]
+    vals = [func(np.asarray((*state, *action)).reshape(1, -1))[0, 0] for action in over]
     maximum = max(vals)
-    return (maximum, over[vals.index(maximum)])
+    return (maximum, over[vals.index(maximum)], None)
 
 
 
 def max_continuous(func: Callable[[Tuple], np.ndarray], over: Iterable[Tuple],\
-    state: Tuple[Union[int, float]]) -> Tuple[float, Tuple[Union[int, float]]]:
+    state: Tuple[Union[int, float]]) -> Tuple[float, Tuple[Union[int, float]], None]:
     """
     Calculates the maximum value of a function over a continuous
-    space. The function is of the form `f(state,...,action) -> float`.
+    space. The function is of the form `f([[state,...,action]]) -> [[float]]`.
 
     Args:
     * func: The function that accepts a tuple of arguments and returns a float
@@ -50,21 +57,22 @@ def max_continuous(func: Callable[[Tuple], np.ndarray], over: Iterable[Tuple],\
     Returns a tuple of:
     * The maximum value,
     * The corresponding argument tuple.
+    * None
     """
     statebounds = tuple(zip(state, state))
     init = tuple([*state, *np.random.uniform(*zip(*over))])
-    funcarg = lambda x: -func(np.asarray(x).reshape(1,-1))[0]
+    funcarg = lambda x: -func(np.asarray(x).reshape(1,-1))[0, 0]
     res = minimize(funcarg, x0=init, bounds=(*statebounds, *over))
-    return (-funcarg(res.x), tuple(res.x[len(state):]))
+    return (-funcarg(res.x), tuple(res.x[len(state):]), None)
 
 
 
 def max_hybrid(func: Callable[[Tuple], np.ndarray], over: Tuple[Tuple],\
     state: Tuple[Union[int, float]], cont: Tuple[bool],\
-    actions: Iterable[Tuple]) -> Tuple[float, Tuple[Union[int, float]]]:
+    actions: Iterable[Tuple]) -> Tuple[float, Tuple[Union[int, float]], None]:
     """
     Calculates the maximum value of a function over a discrete-continuous hybrid
-    space. The function is of the form `f(state,...,action) -> float`.
+    space. The function is of the form `f([[state,...,action]]) -> [[float]]`.
 
     Args:
     * func: The function that accepts a tuple of arguments and returns a float
@@ -79,10 +87,11 @@ def max_hybrid(func: Callable[[Tuple], np.ndarray], over: Tuple[Tuple],\
     Returns a tuple of:
     * The maximum value,
     * The corresponding action argument tuple.
+    * None
     """
     best = -np.inf
     bestarg = None
-    funcarg = lambda x: -func(np.asarray(x).reshape(1, -1))[0]
+    funcarg = lambda x: -func(np.asarray(x).reshape(1, -1))[0, 0]
     statebounds = tuple(zip(state, state))
     for act in actions:
         actbounds = [b if c else (a, a) for a, c, b in zip(act, cont, over)]
@@ -93,4 +102,23 @@ def max_hybrid(func: Callable[[Tuple], np.ndarray], over: Tuple[Tuple],\
             best = val
             bestarg = res.x
     return (best, tuple([float(v) if c else int(v) for v, c in \
-                            zip(bestarg[len(state):], cont)]))
+                            zip(bestarg[len(state):], cont)]), None)
+
+
+
+def max_array(func: Callable[[Tuple], np.ndarray], state: Tuple[Union[int, float]]) \
+    -> Tuple[float, Tuple[int], np.ndarray]:
+    """
+    Calcualtes the maximum value and corresponding index/argument over a
+    supplied 1D array. The function is of the form `f([[state,...,action]]) -> [[float]]`.
+    That is, computes the maximum value for a function that returns an array of
+    values.
+
+    Returns a tuple of:
+    * The maximum value,
+    * The corresponding action argument tuple,
+    * The whole array (1D).
+    """
+    arr = func((state,)).ravel()
+    max_index = np.argmax(arr)
+    return (arr[max_index], (max_index,), arr)

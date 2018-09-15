@@ -5,7 +5,7 @@ episode.
 
 import numpy as np
 
-from ..helpers.spaces import to_space, to_tuple, len_space_tuple
+from ..helpers.spaces import to_space, to_tuple
 
 
 def nsteptd(agent: 'Agent', memory: 'Memory', discount: float, steps: int=0,\
@@ -35,7 +35,7 @@ def nsteptd(agent: 'Agent', memory: 'Memory', discount: float, steps: int=0,\
     # s0  s1  s2  s3  s4  s5  s6  s7
     # a0  a1  a2  a3  a4  a5  a6        a0 is action from s0 -> s1
     # r0  r1  r2  r3  r4  r5  r6        r0 is reward from a0
-    # 0   1   2   3   4   5   t  t+1
+    # 0   1   2   3   4   5   t  t+1    t is current time
     #        tau  -   -   -   -         TD(4) - current + delayed rewards
     #                tau  -   -         TD(2) - current + delayed rewards
     #                        tau        TD(0) - only current reward
@@ -48,9 +48,8 @@ def nsteptd(agent: 'Agent', memory: 'Memory', discount: float, steps: int=0,\
     t = 0           # time from beginning of episode i.e current timestep
 
     # preallocate arrays for states (X) -> value targets (Y) for approximator
-    batchX = np.zeros((memory.batchsize, len(states[-1]) + \
-                        len_space_tuple(agent.env.action_space)))
-    batchY = np.zeros(memory.batchsize)
+    batchX = np.zeros((memory.batchsize, agent.value.indim))
+    batchY = np.zeros((memory.batchsize, agent.value.outdim))
 
     # Choice between using discounted total returns, or average returns.
     if discount == -1:
@@ -93,20 +92,38 @@ def nsteptd(agent: 'Agent', memory: 'Memory', discount: float, steps: int=0,\
             # memorize experience
             memory.append((states[tau], actions[tau], partial_ret, states[tau+k+1], k))
 
-            # replay experience from memory
-            samples = memory.sample()
-            for i, (s, a, partial_r, ns, k) in enumerate(samples):
-                # calculate new estimate of return
-                nvalue, _ = agent.maximum(ns)
-                ret = partial_r + discount**(k+1) * nvalue
-                # If discount=-1 initially, then calculate mean return instead
-                # of discounted total return. k+2 is the number of terms in
-                # the return calculation (k+1 rewards + 1 prior value term)
-                if average_returns:
-                    ret /= k + 2
-                # fill batch with state/actions -> values
-                batchX[i] = [*s, *a]
-                batchY[i] = ret
+            # Replay experience from memory and calculate new estimate of return.
+            # An approximator with outdim=1, the output value will only be for
+            # the action taken (since it is passed as argument). So only that
+            # action value needs to be updated.
+            if agent.value.outdim == 1:
+                for i, (s, a, partial_r, ns, k) in enumerate(memory.sample()):
+                    nvalue, _ = agent.maximum(ns)
+                    ret = partial_r + discount**(k+1) * nvalue
+                    # If discount=-1 initially, then calculate mean return instead
+                    # of discounted total return. k+2 is the number of terms in
+                    # the return calculation (k+1 rewards + 1 prior value term)
+                    if average_returns:
+                        ret /= k + 2
+                    # fill batch with state/actions -> values
+                    batchX[i] = [*s, *a]
+                    batchY[i] = ret
+            # An approximator with outdim > 1 will return a multi-column row
+            # vector which has action values for all actions. So a new vector
+            # is constructed which only updates the estimate for the action
+            # taken and uses prior estimates for other actions.
+            else:
+                for i, (s, a, partial_r, ns, k) in enumerate(memory.sample()):
+                    nvalue, _, predictions = agent.maximum(ns)
+                    ret = partial_r + discount**(k+1) * nvalue
+                    if average_returns:
+                        ret /= k + 2
+                    # fill batch with state/actions -> values. Use old values
+                    # for actions not taken.
+                    batchX[i] = s
+                    batchY[i] = predictions
+                    batchY[i, a] = ret
+
             # update value function with new estimate
             agent.value.update(batchX, batchY)
         t += 1

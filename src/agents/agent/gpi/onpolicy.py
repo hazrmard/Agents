@@ -12,7 +12,7 @@ will reflect the true value of states (and not a biased estimate).
 
 import numpy as np
 
-from ...helpers.parameters import Schedule
+from ...helpers.schedule import Schedule
 from ...algorithm import nstepsarsa
 from .agent import Agent, GREEDY
 

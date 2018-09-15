@@ -8,7 +8,7 @@ Contains off-policy temporal difference agents:
 
 import numpy as np
 
-from ...helpers.parameters import Schedule
+from ...helpers.schedule import Schedule
 from ...algorithm import q, nsteptd
 from .agent import Agent, GREEDY
 
