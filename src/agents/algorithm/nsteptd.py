@@ -98,7 +98,7 @@ def nsteptd(agent: 'Agent', memory: 'Memory', discount: float, steps: int=0,\
             # action value needs to be updated.
             if agent.value.outdim == 1:
                 for i, (s, a, partial_r, ns, k) in enumerate(memory.sample()):
-                    nvalue, _ = agent.maximum(ns)
+                    nvalue, _, _ = agent.maximum(ns)
                     ret = partial_r + discount**(k+1) * nvalue
                     # If discount=-1 initially, then calculate mean return instead
                     # of discounted total return. k+2 is the number of terms in

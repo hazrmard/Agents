@@ -52,7 +52,7 @@ def q(agent: 'Agent', memory: 'Memory', discount: float, maxsteps: int=np.inf,\
         if agent.value.outdim == 1:
             for i, (s, a, r, ns) in enumerate(memory.sample()):
                 # calculate new estimate of return
-                nvalue, _ = agent.maximum(ns)
+                nvalue, _, _ = agent.maximum(ns)
                 ret = r + discount * nvalue
                 # fill batch with state/actions -> values
                 batchX[i] = [*s, *a]
